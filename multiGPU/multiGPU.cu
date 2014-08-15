@@ -60,7 +60,7 @@ reduce(float *g_idata, float *g_odata, unsigned int n)
 /*
 *    Example of reduce kernel using multiple GPUs
 *   
-*    Compute sum of 1,048,576 elements using 4 GPUs @tesla-cmc server
+*    Compute sum of (PER_DEVICE_DATA*GPU_cnt) elements using 4 GPUs @tesla-cmc server
 *         
 */
 int main(int argc, char **argv)

@@ -15,5 +15,3 @@ run: build
 
 clean:
 	rm -f multiGPU
-
-clobber: clean
