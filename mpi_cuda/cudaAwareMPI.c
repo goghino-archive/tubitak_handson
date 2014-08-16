@@ -7,14 +7,6 @@ int main( int argc, char** argv )
 {
     MPI_Init (&argc, &argv);
  
- 
-    // Ensure that RDMA ENABLED CUDA is set correctly
-    int direct = getenv("MPICH_RDMA_ENABLED_CUDA")==NULL?0:atoi(getenv ("MPICH_RDMA_ENABLED_CUDA"));
-    if(direct != 1){
-        printf ("MPICH_RDMA_ENABLED_CUDA not enabled!\n");
-        exit (EXIT_FAILURE);
-    }
- 
     // Get MPI rank and size
     int rank, size;
     MPI_Comm_rank (MPI_COMM_WORLD, &rank);
@@ -38,9 +30,9 @@ int main( int argc, char** argv )
         cudaMemcpy(rank_recv_h, rank_recv_d, size*sizeof(int), cudaMemcpyDeviceToHost);
         cudaFree(rank_recv_d);        
 
-        printf("Ranks recieived from other processes\n");
+        printf("Ranks recieived from other processes:\n");
         for(int i=1; i<size; i++)
-            printf("%d\n",rank_recv_h[i]);
+            printf("\t%d\n",rank_recv_h[i]);
         free(rank_recv_h);
     }else{
         // Processes send their rank to master process (rank==0)

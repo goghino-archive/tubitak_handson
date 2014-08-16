@@ -1,8 +1,8 @@
 NVCC := nvcc
-cc := gcc
+cc := /home/jkardos/openmpi-1.8.1/install/bin/mpicc
 FLAGS := -g
-INCLUDE := -I/opt/cuda/include -I/opt/openmpi-r27467/include
-LDFLAGS := -L/opt/cuda/lib64 -L/opt/openmpi-r27467/lib
+INCLUDE := -I/opt/cuda/include
+LDFLAGS := -L/opt/cuda/lib64
 CFLAGS := -std=c99 -Wall
  
 
@@ -12,10 +12,10 @@ all: build
 build: cudaMPI
 
 cudaMPI: cudaAwareMPI.c
-	$(cc) $(CFLAGS) $(INCLUDE) $(FLAGS) $(LDFLAGS) -o $@ $< -lcudart -lmpi
+	$(cc) $(CFLAGS) $(INCLUDE) $(FLAGS) $(LDFLAGS) -o $@ $< -lcudart
 
 run: build
-	export MPICH_RDMA_ENABLED_CUDA=1 && mpirun -np 4 ./cudaMPI
+	/home/jkardos/openmpi-1.8.1/install/bin/mpirun -np 4 ./cudaMPI
 
 clean:
 	rm -f cudaMPI

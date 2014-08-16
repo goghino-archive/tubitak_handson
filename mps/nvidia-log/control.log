@@ -1,0 +1,15 @@
+[2014-08-16 15:56:32.333 Control  5622] Start
+[2014-08-16 15:59:19.366 Control  5622] Accepting connection...
+[2014-08-16 15:59:19.366 Control  5622] NEW UI
+[2014-08-16 15:59:19.366 Control  5622] Cmd:quit
+[2014-08-16 15:59:19.366 Control  5622] Exit with status 0
+[2014-08-16 15:59:23.602 Control 17598] Start
+[2014-08-16 15:59:32.238 Control 17598] Accepting connection...
+[2014-08-16 15:59:32.238 Control 17598] NEW UI
+[2014-08-16 15:59:32.239 Control 17598] Cmd:quit
+[2014-08-16 15:59:32.239 Control 17598] Exit with status 0
+[2014-08-16 16:00:32.957 Control 22311] Start
+[2014-08-16 16:00:57.397 Control 22311] Accepting connection...
+[2014-08-16 16:00:57.398 Control 22311] NEW UI
+[2014-08-16 16:00:57.398 Control 22311] Cmd:quit
+[2014-08-16 16:00:57.398 Control 22311] Exit with status 0

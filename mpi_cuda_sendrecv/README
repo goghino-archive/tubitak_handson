@@ -1,0 +1,29 @@
+This sample demonstrates how GPU device memory pointers can be used directly in MPI_Send/MPI_Recv calls. Works with OpenMPI implementation newer than 1.5.3 (in this test svn trunk is used).
+
+[dmikushin@sm47 mpi_cuda_sendrecv]$ make
+mpicc -g -std=c99 -I/usr/local/cuda/include -I/opt/cuda/include -c mpi_cuda_sendrecv.c -o mpi_cuda_sendrecv.o
+nvcc -g -c pattern2d.cu -o pattern2d.o
+mpicc mpi_cuda_sendrecv.o pattern2d.o -o mpi_cuda_sendrecv -L/usr/local/cuda/lib64 -L/opt/cuda/lib64 -lcudart
+
+[dmikushin@sm47 mpi_cuda_sendrecv]$ mpirun -np 2 ./mpi_cuda_sendrecv 1024 10
+2 CUDA device(s) found
+Sending process 0 resulting field with average = 1.350171 to process 1
+Sending process 1 resulting field with average = 1.374226 to process 0
+Sending process 0 resulting field with average = 1.374226 to process 1
+Sending process 1 resulting field with average = 1.350171 to process 0
+Sending process 0 resulting field with average = 1.350171 to process 1
+Sending process 1 resulting field with average = 1.374226 to process 0
+Sending process 1 resulting field with average = 1.350171 to process 0
+Sending process 0 resulting field with average = 1.374226 to process 1
+Sending process 0 resulting field with average = 1.350171 to process 1
+Sending process 1 resulting field with average = 1.374226 to process 0
+Sending process 1 resulting field with average = 1.350171 to process 0
+Sending process 0 resulting field with average = 1.374226 to process 1
+Sending process 1 resulting field with average = 1.374226 to process 0
+Sending process 0 resulting field with average = 1.350171 to process 1
+Sending process 0 resulting field with average = 1.374226 to process 1
+Sending process 1 resulting field with average = 1.350171 to process 0
+Sending process 1 resulting field with average = 1.374226 to process 0
+Sending process 0 resulting field with average = 1.350171 to process 1
+Sending process 1 resulting field with average = 1.350171 to process 0
+Sending process 0 resulting field with average = 1.374226 to process 1
