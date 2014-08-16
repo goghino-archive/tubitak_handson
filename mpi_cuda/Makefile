@@ -1,4 +1,4 @@
-NVCC := nvcc
+#we need cuda aware build of MPI library
 cc := /home/jkardos/openmpi-1.8.1/install/bin/mpicc
 FLAGS := -g
 INCLUDE := -I/opt/cuda/include

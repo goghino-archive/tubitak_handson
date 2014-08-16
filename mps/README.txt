@@ -1,25 +1,24 @@
-Starting MPS client application
+HOWTO: Starting MPS client application
 https://docs.nvidia.com/deploy/pdf/CUDA_Multi_Process_Service_Overview.pdf
--------------------------------
+
 
 Set the following variables in the client process’s environment. Note that
-
 CUDA_VISIBLE_DEVICES should not be set in the client’s environment.
 
-# Set to the same location as the MPS control daemon
+# Set to the same location as the MPS control daemon (see startMPS.sh)
 export CUDA_MPS_PIPE_DIRECTORY=...
 
-# Set to the same location as the MPS control daemon
+# Set to the same location as the MPS control daemon (see startMPS.sh)
 export CUDA_MPS_LOG_DIRECTORY=...
 
 Run application as usual
 
 ------------------------------------------------------------------------------------------
 ------------------------------------------------------------------------------------------
-Difference you should see:
+Difference you should see when running without/with MPS:
 
 
-CUDA_VISIBLE_DEVICES=0 CUDA_MPS_PIPE_DIRECTORY=/home/jkardos/hands-on/mps/nvida-mps CUDA_MPS_LOG_DIRECTORY=/home/jkardos/hands-on/mps/nvidia-log mpirun -np 3 ./mpi input5.txt
+jkardos@tesla-cmc:~/hands-on/mps$ mpirun -np 3 ./mpi input5.txt
 Reading file - success!
 Reading file - success!
 Reading file - success!
@@ -64,11 +63,12 @@ Time for GPU calculation equals 2.29 seconds
 
 ----------------------------------------------------------------------------------------------
 ----------------------------------------------------------------------------------------------
-generating profiles:
+HOWTO: Generating performance profile to see how kernels are executed
 http://docs.nvidia.com/cuda/profiler-users-guide/#mps-profiling
+
 1)nvprof --profile-all-processes -o output_%p
 2)open new terminal
-3)run multiprocess mpi application
-4)return to nvprof
+3)run multiprocess mpi application (i.e. mpirun)
+4)return to nvprof terminal
 5)ctrl^c
 6)import generated profile filen into nvvp multiprocess view

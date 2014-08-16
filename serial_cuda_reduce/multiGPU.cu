@@ -1,3 +1,15 @@
+/*
+ *
+ * Copyright (c) 2014 Juraj Kardos
+ *
+ * This software is provided 'as-is', without any express or implied warranty.
+ * In no event will the authors be held liable for any damages arising 
+ * from the use of this software.
+ * Permission is granted to anyone to use this software for any purpose, 
+ * including commercial applications, and to alter it and redistribute it freely,
+ * without any restrictons.
+ */
+
 // System includes
 #include <stdio.h>
 #include <assert.h>
@@ -26,6 +38,9 @@ typedef struct
 // Gets last error and prints message when error is present
 void check_cuda_error(const char *message);
 
+// Computes SUM reduction using shared memory
+// Outputs partial sums for each block, need to further
+// reduce them on CPU.
 __global__ void
 reduce(float *g_idata, float *g_odata, unsigned int n)
 {
@@ -58,9 +73,10 @@ reduce(float *g_idata, float *g_odata, unsigned int n)
 
 
 /*
-*    Example of reduce kernel using multiple GPUs
+*    Example of serial application using multiple GPUs
 *   
-*    Compute sum of (PER_DEVICE_DATA*GPU_cnt) elements using 4 GPUs @tesla-cmc server
+*    Compute sum of (PER_DEVICE_DATA*GPU_cnt) elements
+*    using 4 GPUs @tesla-cmc server
 *         
 */
 int main(int argc, char **argv)
@@ -79,16 +95,18 @@ int main(int argc, char **argv)
 
     for(int i=0; i<GPU_cnt*PER_DEVICE_DATA; i++)
     {
-        //data[i] = (float)rand() / (float)RAND_MAX;
-        data[i] = 0.5f; //result = 524,288
+        //data[i] = (float)rand() / (float)RAND_MAX; // result = ???
+        data[i] = 0.5f; //result = (PER_DEVICE_DATA*GPU_cnt)*0.5
     }
 
     //Set up computation
     for (int i = 0; i < GPU_cnt; i++)
     {
+        //select current device
         cudaSetDevice(i);
         check_cuda_error("Setting up device!");
 
+        //create cuda stream for current device
         cudaStreamCreate(&gpuData[i].stream);
         check_cuda_error("Create stream");
 
@@ -103,7 +121,7 @@ int main(int argc, char **argv)
         cudaMallocHost((void **)&gpuData[i].sum_h, BLOCK_N*sizeof(float));
         check_cuda_error("Host page-locked memory allocation");
 
-        //coppy to pinned memory
+        //copy our data to pinned host memory
         for (int j=0; j<PER_DEVICE_DATA; j++)
         {
             gpuData[i].data_h[j] = data[i*PER_DEVICE_DATA+j];
@@ -121,7 +139,7 @@ int main(int argc, char **argv)
         cudaSetDevice(i);
         check_cuda_error("Setting up device!");
 
-        //Copy input data from CPU
+        //Copy input data from pinned host memory
         cudaMemcpyAsync(gpuData[i].data_d, gpuData[i].data_h, PER_DEVICE_DATA*sizeof(float),
                         cudaMemcpyHostToDevice, gpuData[i].stream);
         check_cuda_error("Copying data H2D");
@@ -131,7 +149,7 @@ int main(int argc, char **argv)
         reduce<<<BLOCK_N, THREAD_N, smemSize, gpuData[i].stream>>>(gpuData[i].data_d, gpuData[i].sum_d, PER_DEVICE_DATA);
         check_cuda_error("Kernel execution failed.\n");
 
-        //Read back GPU results
+        //Copy back GPU results
         cudaMemcpyAsync(gpuData[i].sum_h, gpuData[i].sum_d, THREAD_N  *sizeof(float),
                         cudaMemcpyDeviceToHost, gpuData[i].stream);
         check_cuda_error("Copying data D2H");
@@ -148,7 +166,7 @@ int main(int argc, char **argv)
         cudaSetDevice(i);
         check_cuda_error("Setting up device!");
 
-        //Wait for all operations to finish
+        //Wait for all operations in device's stream to finish
         cudaStreamSynchronize(gpuData[i].stream);
         check_cuda_error("Synchronization error");
 

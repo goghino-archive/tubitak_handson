@@ -13,7 +13,7 @@ pattern2d.o: pattern2d.cu
 	nvcc -g -c $< -o $@
 
 run:
-	/home/jkardos/openmpi-1.8.1/install/bin/mpirun -np 2 ./mpi_cuda_sendrecv 1024 10
+	/home/jkardos/openmpi-1.8.1/install/bin/mpirun -np 2 ./mpi_cuda_sendrecv 1024 2
 
 clean:
 	rm -rf *.o mpi_cuda_sendrecv

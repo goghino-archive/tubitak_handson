@@ -25,6 +25,9 @@ pattern2d.o: pattern2d.cu pattern2d.h
 timing.o: timing.c timing.h
 	gcc -g $(OPT) -c $< -o $@
 
+run:
+	./serial_cuda
+
 clean:
 	rm -rf *.o serial_cuda
 
