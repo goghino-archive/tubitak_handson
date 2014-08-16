@@ -22,35 +22,36 @@ int main( int argc, char** argv )
  
 
     // Allocate host and device buffers and copy rank value to GPU
-    int *h_buff = NULL;
-    int *d_rank = NULL;
-    int *d_buff = NULL;
-    size_t bytes = size*sizeof(int);
-    h_buff = (int*)malloc(bytes);
-    cudaMalloc((void **)&d_buff, bytes);
-    cudaMalloc((void **)&d_rank, sizeof(int));
-    cudaMemcpy(d_rank, &rank, sizeof(int), cudaMemcpyHostToDevice);
+    int *rank_d = NULL;
+    cudaMalloc((void **)&rank_d, sizeof(int));
+    cudaMemcpy(rank_d, &rank, sizeof(int), cudaMemcpyHostToDevice);
  
 
-    // Preform Allgather using device buffer
-    MPI_Allgather(d_rank, 1, MPI_INT, d_buff, 1, MPI_INT, MPI_COMM_WORLD);
+    int *rank_recv_d;
+    if(rank ==0){
+        // Master proces receives ranks of other processes and prints it
+        cudaMalloc((void **)&rank_recv_d, (size)*sizeof(int));
+        for(int i=1; i<size; i++)        
+            MPI_Recv(&rank_recv_d[i], 1, MPI_INT, i, i, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        
+        int *rank_recv_h = malloc((size)*sizeof(int));
+        cudaMemcpy(rank_recv_h, rank_recv_d, size*sizeof(int), cudaMemcpyDeviceToHost);
+        cudaFree(rank_recv_d);        
 
-
-    // Check that the GPU buffer is correct
-    cudaMemcpy(h_buff, d_buff, bytes, cudaMemcpyDeviceToHost);
-    for(int i=0; i<size; i++){
-        if(h_buff[i] != i) {
-            printf ("Alltoall Failed!\n");
-            exit (EXIT_FAILURE);
-        }
+        printf("Ranks recieived from other processes\n");
+        for(int i=1; i<size; i++)
+            printf("%d\n",rank_recv_h[i]);
+        free(rank_recv_h);
+    }else{
+        // Processes send their rank to master process (rank==0)
+        MPI_Send(rank_d, 1, MPI_INT, 0, rank, MPI_COMM_WORLD);
     }
+
+
     if(rank==0)
         printf("Success!\n");
  
     // Clean up
-    free(h_buff);
-    cudaFree(d_buff);
-    cudaFree(d_rank);
     MPI_Finalize();
  
     return 0;
