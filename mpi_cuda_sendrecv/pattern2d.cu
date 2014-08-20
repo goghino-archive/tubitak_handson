@@ -104,7 +104,7 @@ int pattern2d_gpu(
 	status = cudaGetLastError();
 	if (status != cudaSuccess)
 	{
-		fprintf(stderr, "Cannot execute CUDA kernel #2, status = %d\n",
+		fprintf(stderr, "Cannot execute CUDA kernel #2, status = %s\n",
 			cudaGetErrorString(status));
 		return status;
 	}
@@ -121,8 +121,8 @@ int pattern2d_gpu(
 	status = cudaGetLastError();
 	if (status != cudaSuccess)
 	{
-		fprintf(stderr, "Cannot execute CUDA kernel #3, status = %d\n",
-			status);
+		fprintf(stderr, "Cannot execute CUDA kernel #3, status = %s\n",
+			cudaGetErrorString(status));
 		return status;
 	}
 
