@@ -59,12 +59,11 @@ int main(int argc, char *argv[])
     checkCudaErrors(cudaEventCreate(&start));
     checkCudaErrors(cudaEventCreate(&stop));
     checkCudaErrors(cudaDeviceSynchronize());
+//------------------------------------------------------------------------------
 
-    // asynchronously copy data, run kernel and copy back
     cudaEventRecord(start, 0);
-    cudaMemcpyAsync(d_a, a, nbytes, cudaMemcpyHostToDevice, 0);
+    cudaMemcpy(d_a, a, nbytes, cudaMemcpyHostToDevice);
     increment_kernel<<<blocks, threads, 0, 0>>>(d_a, value);
-    cudaMemcpyAsync(a, d_a, nbytes, cudaMemcpyDeviceToHost, 0);
     cudaEventRecord(stop, 0);
 
     // have CPU do some work while waiting for stage 1 to finish
@@ -76,10 +75,35 @@ int main(int argc, char *argv[])
         counter++;
     }
     nvtxRangePop();
+    cudaMemcpy(a, d_a, nbytes, cudaMemcpyDeviceToHost);
+    cudaEventRecord(stop, 0);
+    cudaDeviceSynchronize();
+
+    float gpu_time_block = 0.0f;
+    checkCudaErrors(cudaEventElapsedTime(&gpu_time_block, start, stop));
+    printf("One big kernel compute time (blocking): %fms\n", gpu_time_block);
+
+//------------------------------------------------------------------------------
+    // asynchronously copy data, run kernel and copy back
+    cudaEventRecord(start, 0);
+    cudaMemcpyAsync(d_a, a, nbytes, cudaMemcpyHostToDevice, 0);
+    increment_kernel<<<blocks, threads, 0, 0>>>(d_a, value);
+    cudaMemcpyAsync(a, d_a, nbytes, cudaMemcpyDeviceToHost, 0);
+    cudaEventRecord(stop, 0);
+
+    // have CPU do some work while waiting for stage 1 to finish
+    counter=0;
+
+    nvtxRangePushA("CPU Compute");
+    while (cudaEventQuery(stop) == cudaErrorNotReady)
+    {
+        counter++;
+    }
+    nvtxRangePop();
 
     float gpu_time = 0.0f;
     checkCudaErrors(cudaEventElapsedTime(&gpu_time, start, stop));
-    printf("One big kernel compute time: %fms\n", gpu_time);
+    printf("One big kernel compute time (async): %fms\n", gpu_time);
 
 //------------------------------------------------------------------------------
 // run kernel on partial data multiple times, overlap computation and communication
@@ -92,8 +116,8 @@ int main(int argc, char *argv[])
     cudaStream_t stream[4];
     cudaStreamCreate(&stream[0]);
     cudaStreamCreate(&stream[1]);
-    cudaStreamCreate(&stream[2]);
     cudaStreamCreate(&stream[3]);
+    cudaStreamCreate(&stream[2]);
     checkCudaErrors(cudaDeviceSynchronize());
 
     int offset = n/4;
@@ -115,7 +139,7 @@ int main(int argc, char *argv[])
     cudaMemcpyAsync(d_a+3*offset, a+3*offset, nbytes/4, cudaMemcpyHostToDevice, stream[3]);
     increment_kernel<<<blocks, threads, 0, stream[3]>>>(d_a+3*offset, value);
     cudaMemcpyAsync(a+3*offset, d_a+3*offset, nbytes/4, cudaMemcpyDeviceToHost, stream[3]);
-    cudaEventRecord(stop, stream[3]);
+    cudaEventRecord(stop, stream[2]);
 
     // have CPU do some work while waiting for stage 1 to finish
     counter=0;
