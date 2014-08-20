@@ -1,0 +1,19 @@
+//USING 4 GPUs
+jkardos@tesla-cmc:~/hands-on/serial_cuda_reduce$ ./multiGPU_sol 
+CUDA-capable device count: 4
+Total size of data: 1.048576e+06
+
+GPU0 result is 131072.00
+GPU1 result is 131072.00
+GPU2 result is 131072.00
+GPU3 result is 131072.00
+Global result is 524288.000000
+
+//USING only 1 GPU
+jkardos@tesla-cmc:~/hands-on/serial_cuda_reduce$ ./multiGPU
+CUDA-capable device count: 1
+Total size of data: 2.621440e+05
+
+GPU0 result is 131072.00
+Global result is 131072.000000
+

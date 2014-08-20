@@ -28,19 +28,16 @@
 #define BLOCK_N (PER_DEVICE_DATA/THREAD_N)
 #define THREAD_N 512
 
-
-// Data structure to hold configuration for each GPU
 typedef struct
 {
-    //pointer to data in device and pinned host memory
+    //pointer to data, device and pinned host
     float *data_d;
     float *data_h;
 
-    //pointer to partial sums in device and pinned host memory
     float *sum_d;
     float *sum_h;
 
-    //Stream for asynchronous command execution for given GPU
+    //Stream for asynchronous command execution
     cudaStream_t stream;
 
 } TGPUdata;
@@ -91,11 +88,10 @@ reduce(float *g_idata, float *g_odata, unsigned int n)
 */
 int main(int argc, char **argv)
 {
- 
-    int GPU_cnt = 1;
-    //TODO
-    //Get count of all available CUDA-capable GPUs into GPU_cnt variable
-    // ...
+    //Get all available CUDA-capable GPUs
+    int GPU_cnt;
+    cudaGetDeviceCount(&GPU_cnt);
+    check_cuda_error("Get device count error!");
     printf("CUDA-capable device count: %d\n", GPU_cnt);
 
     TGPUdata *gpuData = (TGPUdata *)malloc(sizeof(TGPUdata)*GPU_cnt);
@@ -106,40 +102,33 @@ int main(int argc, char **argv)
 
     for(int i=0; i<GPU_cnt*PER_DEVICE_DATA; i++)
     {
+        //data[i] = (float)rand() / (float)RAND_MAX; // result = ???
         data[i] = 0.5f; //result = (PER_DEVICE_DATA*GPU_cnt)*0.5
     }
 
     //Set up computation
     for (int i = 0; i < GPU_cnt; i++)
     {
-        //TODO
-        //Select current device
-        //...        
+        //select current device
+        cudaSetDevice(i);
         check_cuda_error("Setting up device!");
 
-        //TODO
-        //Create cuda stream for current device,
-        //use "gpuData" sturcture, "stream" array
-        //...
+        //create cuda stream for current device
+        cudaStreamCreate(&gpuData[i].stream);
         check_cuda_error("Create stream");
 
-        //TODO
-        //Allocate device memory on current GPU
+        //Allocate memory
         cudaMalloc((void **)&gpuData[i].data_d, PER_DEVICE_DATA * sizeof(float));
         check_cuda_error("Device memory allocation");
         cudaMalloc((void **)&gpuData[i].sum_d, BLOCK_N*sizeof(float));
         check_cuda_error("Device memory allocation");
 
-        //TODO
-        //Remember that asynchronous data transfers require host pinned memory
-        //instead of pageable memory allocated with malloc(). Use pinned memory
-        //alocation instead of malloc()
-        gpuData[i].data_h = (float *)malloc(PER_DEVICE_DATA* sizeof(float));
-        check_cuda_error("Host memory allocation");
-        gpuData[i].sum_h = (float *)malloc(BLOCK_N*sizeof(float));
-        check_cuda_error("Host memory allocation");
+        cudaMallocHost((void **)&gpuData[i].data_h, PER_DEVICE_DATA* sizeof(float));
+        check_cuda_error("Host page-locked memory allocation");
+        cudaMallocHost((void **)&gpuData[i].sum_h, BLOCK_N*sizeof(float));
+        check_cuda_error("Host page-locked memory allocation");
 
-        //copy our input data to (pinned) host memory
+        //copy our data to pinned host memory
         for (int j=0; j<PER_DEVICE_DATA; j++)
         {
             gpuData[i].data_h[j] = data[i*PER_DEVICE_DATA+j];
@@ -150,30 +139,24 @@ int main(int argc, char **argv)
     //Copy data to GPU, launch the kernel and copy data back. All asynchronously
     for (int i = 0; i < GPU_cnt; i++)
     {
-        //TODO
-        //Select current device
-        //...        
+        //Set device
+        cudaSetDevice(i);
         check_cuda_error("Setting up device!");
 
-
-        //TODO
-        //Copy input data from pinned host memory into device memory
-        //Use asynchronous version of memory copy, don't forget set correct stream
-        cudaMemcpy(gpuData[i].data_d, gpuData[i].data_h, PER_DEVICE_DATA*sizeof(float),
-                   cudaMemcpyHostToDevice);
+        //Copy input data from pinned host memory
+        cudaMemcpyAsync(gpuData[i].data_d, gpuData[i].data_h, PER_DEVICE_DATA*sizeof(float),
+                        cudaMemcpyHostToDevice, gpuData[i].stream);
         check_cuda_error("Copying data H2D");
 
-        //TODO
-        //Issue kernel launch to correct stream
+        //Perform GPU computations
         int smemSize =  THREAD_N * sizeof(float);
-        reduce<<<BLOCK_N, THREAD_N, smemSize>>>(gpuData[i].data_d, gpuData[i].sum_d, PER_DEVICE_DATA);
+        reduce<<<BLOCK_N, THREAD_N, smemSize, gpuData[i].stream>>>(gpuData[i].data_d, gpuData[i].sum_d, PER_DEVICE_DATA);
         check_cuda_error("Kernel execution failed.\n");
-        
-        //TODO
-        //Copy data from device into pinned host memory
-        //Use asynchronous version of memory copy, don't forget set correct stream
-        cudaMemcpy(gpuData[i].sum_h, gpuData[i].sum_d, THREAD_N  *sizeof(float),
-                    cudaMemcpyDeviceToHost);
+
+        //Copy back GPU results
+        cudaMemcpyAsync(gpuData[i].sum_h, gpuData[i].sum_d, THREAD_N  *sizeof(float),
+                        cudaMemcpyDeviceToHost, gpuData[i].stream);
+        check_cuda_error("Copying data D2H");
     }
 
     float globalSUM = 0;
@@ -183,14 +166,12 @@ int main(int argc, char **argv)
     {
         float sum;
 
-        //TODO
-        //Select current device
-        //...        
+        //Set device
+        cudaSetDevice(i);
         check_cuda_error("Setting up device!");
-        
-        //TODO
-        //wait for all operations in given device stream to finish
-        //...
+
+        //Wait for all operations in device's stream to finish
+        cudaStreamSynchronize(gpuData[i].stream);
         check_cuda_error("Synchronization error");
 
         //Finalize GPU reduction for current subvector
@@ -210,30 +191,26 @@ int main(int argc, char **argv)
     // Cleanup and shutdown
     for (int i = 0; i < GPU_cnt; i++)
     {
-        //TODO
-        //Select current device
-        //...        
+        //Set device
+        cudaSetDevice(i);
         check_cuda_error("Setting up device!");
 
-        
-        //TODO
-        //clean up pinned memory instead of pageable
-        free(gpuData[i].data_h);
-        free(gpuData[i].sum_h);
-
+        //Shut down this GPU
+        cudaFreeHost(gpuData[i].data_h);
+        check_cuda_error("Free host memory");
+        cudaFreeHost(gpuData[i].sum_h);
+        check_cuda_error("Free host memory");
         cudaFree(gpuData[i].data_d);
         check_cuda_error("Free device memory");
         cudaFree(gpuData[i].sum_d);
         check_cuda_error("Free device memory");
-
-        //TODO
-        //delete stream data structure
-        //...
+        cudaStreamDestroy(gpuData[i].stream);
         check_cuda_error("Stream destroy");
 
         cudaDeviceReset();
     }
-       
+    
+
     //no longer needed
     free(data);
     free(gpuData);
