@@ -93,4 +93,4 @@ http://docs.nvidia.com/cuda/profiler-users-guide/#mps-profiling
 3)run multiprocess mpi application (i.e. mpirun)
 4)return to nvprof terminal
 5)ctrl^c
-6)import generated profile filen into nvvp multiprocess view
+6)import generated profile files into nvvp multiprocess view

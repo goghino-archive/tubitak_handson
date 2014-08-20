@@ -21,12 +21,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-//TODO
-// Application communicates GPU buffers over MPI. Buffers are first copied
-// to host memory and only then sent over MPI. Recieived buffers are copied
-// back to GPU. Locate these intermediate memory copies and replace them
-// by CUDA-aware communication pattern. 
-
 int main(int argc, char* argv[])
 {
 	// Initialize MPI. From this point the specified
@@ -195,21 +189,12 @@ int main(int argc, char* argv[])
                 int inext = (iprocess + 1) % nprocesses;
                 int iprev = (iprocess - 1) % nprocesses; iprev += (iprev < 0) ? nprocesses : 0;
 	
-        // Copy GPU buffer to host, so that we can send it over MPI
-		float *din1_h = malloc(size);
-        float *din2_h = malloc(size);
-        cudaMemcpy(din1_h, din1, size, cudaMemcpyDeviceToHost);
-        
-        // Communicate over MPI
-		mpi_status = MPI_Isend(din1_h, n * n, MPI_FLOAT, inext, 0, MPI_COMM_WORLD, &request);
-		mpi_status = MPI_Recv(din2_h, n * n, MPI_FLOAT, iprev, 0,	MPI_COMM_WORLD, NULL);
+		// Pass entire process input device buffer directly to input device buffer
+		// of next process.
+		mpi_status = MPI_Isend(din1, n * n, MPI_FLOAT, inext, 0, MPI_COMM_WORLD, &request);
+		mpi_status = MPI_Recv(din2, n * n, MPI_FLOAT, iprev, 0,	MPI_COMM_WORLD, NULL);
 		mpi_status = MPI_Wait(&request, MPI_STATUS_IGNORE);
 		
-        // Copy recieved data to GPU buffer
-        cudaMemcpy(din2, din2_h, size, cudaMemcpyHostToDevice);
-        free(din1_h);
-        free(din2_h);
-
 		// Swap buffers.
 		float* swap = din1; din1 = din2; din2 = swap;
 	}
@@ -225,7 +210,7 @@ int main(int argc, char* argv[])
 	cuda_status = cudaFree(dout);
 	if (cuda_status != cudaSuccess)
 	{
-		fprintf(stderr, "Cannot free output device buffer by process d, status = %d\n",
+		fprintf(stderr, "Cannot free output device buffer by process %d, status = %s\n",
 			iprocess, cudaGetErrorString(cuda_status));
 		return 1;
 	}
