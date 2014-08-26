@@ -125,9 +125,7 @@ int main(int argc, char **argv)
 
         //TODO
         //Allocate device memory on current GPU
-        cudaMalloc((void **)&gpuData[i].data_d, PER_DEVICE_DATA * sizeof(float));
         check_cuda_error("Device memory allocation");
-        cudaMalloc((void **)&gpuData[i].sum_d, BLOCK_N*sizeof(float));
         check_cuda_error("Device memory allocation");
 
         //TODO
