@@ -1,0 +1,5 @@
+/home/jkardos/openmpi-1.8.1/install/bin/mpirun -np 4 ./cudaMPI
+[slave] Sending my rank: 1
+[slave] Sending my rank: 3
+[slave] Sending my rank: 2
+[master] Ranks recieived from slave processes: 1  2  3 

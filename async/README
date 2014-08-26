@@ -1,0 +1,7 @@
+One big kernel compute time (blocking): 35.003902ms
+One big kernel compute time (async): 34.853474ms
+Many small kernels compute time (single GPU): 23.475201ms
+Speedup is 1.484693
+Found 4 CUDA capable devices
+Many small kernels compute time (multi GPU): 20.094048ms
+Speedup is 1.734517
