@@ -25,7 +25,9 @@ __global__ void increment_kernel(int *g_data, int inc_value)
     if(idx > n/4)
       return;
 
-    g_data[idx] = g_data[idx] + inc_value;
+    //to be more computational intensive, repeat same task multiple times
+    for(int i=0; i<30; i++)
+        g_data[idx] = g_data[idx] + inc_value;
 }
 
 #define checkCudaErrors(cuda_call)  \
