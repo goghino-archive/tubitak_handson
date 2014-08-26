@@ -45,25 +45,19 @@ int main(int argc, char *argv[])
     int nbytes = n * sizeof(int);
     int value = 26;
 
-    // allocate pinned host memory
+    // allocate host memory
     int *a = 0;
-    //TODO
-    //allocate pinned memory to hold our input data
-    //...
-    //memset(a, 0, nbytes);
+    checkCudaErrors(cudaMallocHost((void **)&a, nbytes));
+    memset(a, 0, nbytes);
 
     // allocate device memory
     int *d_a=0;
-    //TODO
-    //Allocate memory on device to hold input data
-    //...
-    //checkCudaErrors(cudaMemset(d_a, 255, nbytes));
+    checkCudaErrors(cudaMalloc((void **)&d_a, nbytes));
+    checkCudaErrors(cudaMemset(d_a, 255, nbytes));
 
-    //TODO
-    // Set kernel launch configuration
-    // For each input element we want one GPU thread
-    dim3 threads = dim3(1,1,1);
-    dim3 blocks  = dim3(1,1,1);
+    // set kernel launch configuration
+    dim3 threads = dim3(512, 1);
+    dim3 blocks  = dim3(n / threads.x, 1);
 
     // create cuda event handles
     cudaEvent_t start, stop;
@@ -72,30 +66,25 @@ int main(int argc, char *argv[])
     checkCudaErrors(cudaDeviceSynchronize());
 
     //multi GPU related set-up
-
-    //TODO
-    //get count of devices for the multi GPU kernel
     int ndevices = 0;
+    cudaGetDeviceCount(&ndevices);
 
     int *d_as[ndevices];
     cudaEvent_t stop_ev[ndevices];
     // create cuda streams for each device
     cudaStream_t stream_multi[4];
 
-    //TODO
-    //set up computation for multi GPU
     for(int i=0; i<ndevices; i++)
     {
-        //TODO
         //select current device
+        cudaSetDevice(i);
 
-        //TODO
         //create cuda stream for current device
+        cudaStreamCreate(&stream_multi[i]);
 
-        //TODO
-        // allocate device memory to hold curent device's part of input data
-        // ...
-        //checkCudaErrors(cudaMemset(d_as[i], 255, nbytes/4));
+        // allocate device memory
+        checkCudaErrors(cudaMalloc((void **)&d_as[i], nbytes));
+        checkCudaErrors(cudaMemset(d_as[i], 255, nbytes/4));
 
 	    //create events
 	    cudaEventCreate(&stop_ev[i]);
@@ -103,7 +92,6 @@ int main(int argc, char *argv[])
 
     cudaSetDevice(0);
 //------------------------------------------------------------------------------
-// 1. We run single kernel with blocking memory copies
 
     cudaEventRecord(start, 0);
     cudaMemcpy(d_a, a, nbytes, cudaMemcpyHostToDevice);
@@ -128,11 +116,11 @@ int main(int argc, char *argv[])
     printf("One big kernel compute time (blocking): %fms\n", gpu_time_block);
 
 //------------------------------------------------------------------------------
-// 2. We run single kernel with non-blocking memory copies
-
-    cudaEventRecord(start, 0);
-    //TODO
     // asynchronously copy data, run kernel and copy back
+    cudaEventRecord(start, 0);
+    cudaMemcpyAsync(d_a, a, nbytes, cudaMemcpyHostToDevice, 0);
+    increment_kernel<<<blocks, threads, 0, 0>>>(d_a, value);
+    cudaMemcpyAsync(a, d_a, nbytes, cudaMemcpyDeviceToHost, 0);
     cudaEventRecord(stop, 0);
 
     // have CPU do some work while waiting for stage 1 to finish
@@ -150,7 +138,7 @@ int main(int argc, char *argv[])
     printf("One big kernel compute time (async): %fms\n", gpu_time);
 
 //------------------------------------------------------------------------------
-// 3. Run kernel on partitioned data multiple times, overlap computation and communication
+// run kernel on partial data multiple times, overlap computation and communication
 
     // set kernel launch configuration
     threads = dim3(512, 1, 1);
@@ -158,20 +146,31 @@ int main(int argc, char *argv[])
 
     // create cuda streams
     cudaStream_t stream[4];
-    //TODO
-    //create 4 streams that we will use for submitting workload to GPU
-
+    cudaStreamCreate(&stream[0]);
+    cudaStreamCreate(&stream[1]);
+    cudaStreamCreate(&stream[3]);
+    cudaStreamCreate(&stream[2]);
     checkCudaErrors(cudaDeviceSynchronize());
 
     int offset = n/4;
 
-    cudaEventRecord(start, stream[0]);
-
-    //TODO
     // asynchronously copy data, run kernel and copy back
-    // Submit cuda operation chain H2D - kernel - D2H into different streams
-    // Each kernel computes only its own partition of data!    
+    cudaEventRecord(start, stream[0]);
+    cudaMemcpyAsync(d_a, a, nbytes/4, cudaMemcpyHostToDevice, stream[0]);
+    increment_kernel<<<blocks, threads, 0, stream[0]>>>(d_a, value);
+    cudaMemcpyAsync(a, d_a, nbytes/4, cudaMemcpyDeviceToHost, stream[0]);
 
+    cudaMemcpyAsync(d_a+offset, a+offset, nbytes/4, cudaMemcpyHostToDevice, stream[1]);
+    increment_kernel<<<blocks, threads, 0, stream[1]>>>(d_a+offset, value);
+    cudaMemcpyAsync(a+offset, d_a+offset, nbytes/4, cudaMemcpyDeviceToHost, stream[1]);
+
+    cudaMemcpyAsync(d_a+2*offset, a+2*offset, nbytes/4, cudaMemcpyHostToDevice, stream[2]);
+    increment_kernel<<<blocks, threads, 0, stream[2]>>>(d_a+2*offset, value);
+    cudaMemcpyAsync(a+2*offset, d_a+2*offset, nbytes/4, cudaMemcpyDeviceToHost, stream[2]);
+
+    cudaMemcpyAsync(d_a+3*offset, a+3*offset, nbytes/4, cudaMemcpyHostToDevice, stream[3]);
+    increment_kernel<<<blocks, threads, 0, stream[3]>>>(d_a+3*offset, value);
+    cudaMemcpyAsync(a+3*offset, d_a+3*offset, nbytes/4, cudaMemcpyDeviceToHost, stream[3]);
     cudaEventRecord(stop, stream[2]);
 
     // have CPU do some work while waiting for stage 1 to finish
@@ -190,7 +189,6 @@ int main(int argc, char *argv[])
     printf("Speedup is %f\n", gpu_time/gpu_time1);
 
 //------------------------------------------------------------------------------
-// 4. We run each stream from previous case on different GPUs  
 
     printf("Found %d CUDA capable devices\n", ndevices);    
 
@@ -200,9 +198,18 @@ int main(int argc, char *argv[])
     //submit work to GPU devices
     for(int i=0; i<ndevices; i++)
     {    
-        //TODO
-        //set device and submit its H2D-kernel-D2H compute chain
+        cudaSetDevice(i);
 
+        cudaMemcpyAsync(d_as[i], a+i*offset, nbytes/4, cudaMemcpyHostToDevice, stream_multi[i]);
+	    increment_kernel<<<blocks, threads, 0, stream_multi[i]>>>(d_as[i], value);
+        /*
+	    cudaError_t errSync  = cudaGetLastError();
+	    cudaError_t errAsync = cudaDeviceSynchronize();
+	    if (errSync != cudaSuccess) 
+	        printf("Sync kernel error: %s\n", cudaGetErrorString(errSync));
+	    if (errAsync != cudaSuccess)
+	        printf("Async kernel %d error: %s\n", i, cudaGetErrorString(errAsync));*/
+        cudaMemcpyAsync(a+i*offset, d_as[i], nbytes/4, cudaMemcpyDeviceToHost, stream_multi[i]);
         cudaEventRecord(stop_ev[i], stream_multi[i]);
     }
 
