@@ -5,9 +5,12 @@ LDFLAGS := -I/opt/cuda/include -L/opt/cuda/lib64
 # Target rules
 all: build
 
-build: async
+build: async async_multi
 
 async: async.cu
+	$(NVCC) $(FLAGS) $(LDFLAGS) -o $@ $< -lnvToolsExt
+
+async_multi: async_multi.cu
 	$(NVCC) $(FLAGS) $(LDFLAGS) -o $@ $< -lnvToolsExt
 
 run: 

@@ -16,13 +16,16 @@
 
 #include "nvToolsExt.h"
 
-#define n (16 * 1024 * 1024)
+#define n (16*1014*1024)
 
 __global__ void increment_kernel(int *g_data, int inc_value)
 {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    for(int i = 0; i<25;i++)    
-        g_data[idx] = g_data[idx] + inc_value;
+
+    if(idx > n/4)
+      return;
+
+    g_data[idx] = g_data[idx] + inc_value;
 }
 
 #define checkCudaErrors(cuda_call)  \
@@ -59,6 +62,33 @@ int main(int argc, char *argv[])
     checkCudaErrors(cudaEventCreate(&start));
     checkCudaErrors(cudaEventCreate(&stop));
     checkCudaErrors(cudaDeviceSynchronize());
+
+    //multi GPU related set-up
+    int ndevices = 0;
+    cudaGetDeviceCount(&ndevices);
+
+    int *d_as[ndevices];
+    cudaEvent_t stop_ev[ndevices];
+    // create cuda streams for each device
+    cudaStream_t stream_multi[4];
+
+    for(int i=0; i<ndevices; i++)
+    {
+        //select current device
+        cudaSetDevice(i);
+
+        //create cuda stream for current device
+        cudaStreamCreate(&stream_multi[i]);
+
+        // allocate device memory
+        checkCudaErrors(cudaMalloc((void **)&d_as[i], nbytes));
+        checkCudaErrors(cudaMemset(d_as[i], 255, nbytes/4));
+
+	    //create events
+	    cudaEventCreate(&stop_ev[i]);
+    }
+
+    cudaSetDevice(0);
 //------------------------------------------------------------------------------
 
     cudaEventRecord(start, 0);
@@ -109,8 +139,8 @@ int main(int argc, char *argv[])
 // run kernel on partial data multiple times, overlap computation and communication
 
     // set kernel launch configuration
-    threads = dim3(512, 1);
-    blocks  = dim3(n / 4 / threads.x, 1);
+    threads = dim3(512, 1, 1);
+    blocks  = dim3(n / 4 / threads.x, 1, 1);
 
     // create cuda streams
     cudaStream_t stream[4];
@@ -157,15 +187,77 @@ int main(int argc, char *argv[])
     printf("Speedup is %f\n", gpu_time/gpu_time1);
 
 //------------------------------------------------------------------------------
+
+    printf("Found %d CUDA capable devices\n", ndevices);    
+
+    //submit work to GPU devices
+    for(int i=0; i<ndevices; i++)
+    {    
+        cudaSetDevice(i);
+
+        cudaMemcpyAsync(d_as[i], a+i*offset, nbytes/4, cudaMemcpyHostToDevice, stream_multi[i]);
+	    increment_kernel<<<blocks, threads, 0, stream_multi[i]>>>(d_as[i], value);
+        /*
+	    cudaError_t errSync  = cudaGetLastError();
+	    cudaError_t errAsync = cudaDeviceSynchronize();
+	    if (errSync != cudaSuccess) 
+	        printf("Sync kernel error: %s\n", cudaGetErrorString(errSync));
+	    if (errAsync != cudaSuccess)
+	        printf("Async kernel %d error: %s\n", i, cudaGetErrorString(errAsync));*/
+        cudaMemcpyAsync(a+i*offset, d_as[i], nbytes/4, cudaMemcpyDeviceToHost, stream_multi[i]);
+        cudaEventRecord(stop_ev[i], stream_multi[i]);
+    }
+
+    // have CPU do some work while waiting for stage 1 to finish
+    counter=0;
+
+    nvtxRangePushA("CPU Compute");
+    while (cudaEventQuery(stop_ev[0]) == cudaErrorNotReady ||
+           cudaEventQuery(stop_ev[1]) == cudaErrorNotReady ||
+           cudaEventQuery(stop_ev[2]) == cudaErrorNotReady ||
+           cudaEventQuery(stop_ev[3]) == cudaErrorNotReady )  
+    {
+        counter++;
+    }
+
+    /*
+    for(int i=0; i<ndevices; i++)
+    {
+      cudaEventSynchronize(stop_ev[i]);  
+    }
+    */
+
+    //cudaDeviceSynchronize();
+
+    nvtxRangePop();
+
+    //checkCudaErrors(cudaEventElapsedTime(&gpu_time1, start, stop));
+    //printf("Many small kernels compute time: %fms\n", gpu_time1);
+    //printf("Speedup is %f\n", gpu_time/gpu_time1);
+
+//------------------------------------------------------------------------------
     // release resources
+    cudaSetDevice(0);
     checkCudaErrors(cudaEventDestroy(start));
     checkCudaErrors(cudaEventDestroy(stop));
+    checkCudaErrors(cudaEventDestroy(stop_ev[0]));
+    checkCudaErrors(cudaEventDestroy(stop_ev[1]));
+    checkCudaErrors(cudaEventDestroy(stop_ev[2]));
+    checkCudaErrors(cudaEventDestroy(stop_ev[3]));
     checkCudaErrors(cudaFreeHost(a));
     checkCudaErrors(cudaFree(d_a));
     cudaStreamDestroy(stream[0]);
     cudaStreamDestroy(stream[1]);
     cudaStreamDestroy(stream[2]);
     cudaStreamDestroy(stream[3]);
+
+    //free memory
+    for(int i=0; i<ndevices; i++)
+    {
+        cudaSetDevice(i);
+        cudaFree(d_as[i]);
+        cudaStreamDestroy(stream_multi[i]);
+    }
 
     // flush all profile data
     cudaDeviceReset();
