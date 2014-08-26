@@ -185,12 +185,15 @@ int main(int argc, char *argv[])
 
     float gpu_time1 = 0.0f;
     checkCudaErrors(cudaEventElapsedTime(&gpu_time1, start, stop));
-    printf("Many small kernels compute time: %fms\n", gpu_time1);
+    printf("Many small kernels compute time (single GPU): %fms\n", gpu_time1);
     printf("Speedup is %f\n", gpu_time/gpu_time1);
 
 //------------------------------------------------------------------------------
 
     printf("Found %d CUDA capable devices\n", ndevices);    
+
+    cudaSetDevice(0);
+    cudaEventRecord(start, stream_multi[0]);
 
     //submit work to GPU devices
     for(int i=0; i<ndevices; i++)
@@ -233,9 +236,11 @@ int main(int argc, char *argv[])
 
     nvtxRangePop();
 
-    //checkCudaErrors(cudaEventElapsedTime(&gpu_time1, start, stop));
-    //printf("Many small kernels compute time: %fms\n", gpu_time1);
-    //printf("Speedup is %f\n", gpu_time/gpu_time1);
+    float gpu_time2 = 0.0f;
+    cudaSetDevice(0);
+    checkCudaErrors(cudaEventElapsedTime(&gpu_time2, start, stop_ev[0]));
+    printf("Many small kernels compute time (multi GPU): %fms\n", gpu_time2);
+    printf("Speedup is %f\n", gpu_time/gpu_time2);
 
 //------------------------------------------------------------------------------
     // release resources
