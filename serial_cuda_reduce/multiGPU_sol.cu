@@ -177,7 +177,7 @@ int main(int argc, char **argv)
         //Finalize GPU reduction for current subvector
         sum = 0;
 
-        for (int j = 0; j < THREAD_N; j++)
+        for (int j = 0; j < BLOCK_N; j++)
         {
             sum += gpuData[i].sum_h[j];
         }

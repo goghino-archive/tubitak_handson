@@ -125,7 +125,8 @@ int main(int argc, char **argv)
 
         //TODO
         //Allocate device memory on current GPU
-        check_cuda_error("Device memory allocation");
+        //Use GpuData sttructure, data_d and sum_d
+	check_cuda_error("Device memory allocation");
         check_cuda_error("Device memory allocation");
 
         //TODO
@@ -194,7 +195,7 @@ int main(int argc, char **argv)
         //Finalize GPU reduction for current subvector
         sum = 0;
 
-        for (int j = 0; j < THREAD_N; j++)
+        for (int j = 0; j < BLOCK_N; j++)
         {
             sum += gpuData[i].sum_h[j];
         }
